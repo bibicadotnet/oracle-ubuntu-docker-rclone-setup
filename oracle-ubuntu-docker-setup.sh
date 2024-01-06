@@ -20,6 +20,8 @@ sudo systemctl start docker
 sudo systemctl enable docker
 apt install docker-compose -y
 
+sudo -v ; curl https://rclone.org/install.sh | sudo bash
+
 # chỉ dành riêng cho Oracle VPS (không cần cài đặt nếu dùng VPS hãng khác)
 sudo wget --no-check-certificate https://raw.githubusercontent.com/bibicadotnet/NeverIdle-Oracle/master/VM.Standard.E2.1.Micro.sh -O /usr/local/bin/bypass_oracle.sh
 chmod +x /usr/local/bin/bypass_oracle.sh
