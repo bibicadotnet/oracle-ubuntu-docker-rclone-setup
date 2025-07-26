@@ -1,7 +1,24 @@
 #!/bin/bash
 
-# cập nhập OS
-sudo apt update && sudo apt upgrade -y
+# Kiểm tra và thêm hostname vào file /etc/hosts
+hostname=$(hostname)
+localhost_ip="127.0.0.1"
+hosts_file="/etc/hosts"
+if grep -q "$hostname" "$hosts_file"; then
+    echo "Hostname $hostname đã có trong $hosts_file."
+else
+    echo "Thêm hostname $hostname vào $hosts_file."
+    # Thêm hostname vào file /etc/hosts
+    echo "$localhost_ip $hostname" | sudo tee -a "$hosts_file" > /dev/null
+    echo "Đã thêm $hostname vào $hosts_file."
+fi
+
+# Update và nâng cấp hệ thống
+apt-get update -y
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y
+apt-get autoremove -y
+apt-get clean
 
 # set locale
 locale-gen en_US.UTF-8
@@ -16,6 +33,11 @@ sudo iptables -F
 # Chỉnh về múi giờ Việt Nam
 timedatectl set-timezone Asia/Ho_Chi_Minh
 
+# Cài đặt Chrony, đồng bộ thời gian
+apt-get install -y chrony
+systemctl start chrony
+systemctl enable chrony
+
 # Tạo swap 4GB RAM
 sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 cat <<EOF > /etc/sysctl.d/99-xs-swappiness.conf
@@ -28,12 +50,28 @@ net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
 EOF
 
-# Cài đặt docker và docker-compose
-curl -sSL https://get.docker.com | sh
-sudo usermod -aG docker $(whoami)
-sudo systemctl start docker
-sudo systemctl enable docker
-apt install docker-compose -y
+# Cài đặt Docker
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker $(whoami)
+systemctl start docker
+systemctl enable docker
+
+# Tối ưu hóa hiệu suất Docker
+mkdir -p /etc/docker
+cat <<EOF > /etc/docker/daemon.json
+{
+  "storage-driver": "overlay2",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "max-concurrent-downloads": 10,
+  "max-concurrent-uploads": 10,
+  "dns": ["8.8.8.8", "1.1.1.1"]
+}
+EOF
+systemctl restart docker
 
 # Cài đặt Rclone
 sudo -v ; curl https://rclone.org/install.sh | sudo bash
